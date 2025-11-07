@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
-export function createSupabaseServerClient() {
+export function createClient() {
   const cookieStore = cookies();
 
   return createServerClient(
@@ -14,12 +14,20 @@ export function createSupabaseServerClient() {
           return cookieStore.get(name)?.value;
         },
         set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options });
+          try {
+            cookieStore.set(name, value, options as any);
+          } catch (e) {
+            console.log("cookie set error", e);
+          }
         },
         remove(name: string, options: any) {
-          cookieStore.set({ name, value: "", ...options, maxAge: 0 });
-        },
-      },
+          try {
+            cookieStore.set(name, "", { ...options, maxAge: 0 } as any);
+          } catch (e) {
+            console.log("cookie remove error", e);
+          }
+        }
+      }
     }
   );
 }

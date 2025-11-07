@@ -1,16 +1,38 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+// app/auth/callback/route.ts
+import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
 
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") ?? "/dashboard";
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const code = url.searchParams.get('code')
+  const next = url.searchParams.get('next') ?? '/dashboard'
 
-  if (code) {
-    const supabase = createRouteHandlerClient({ cookies });
-    await supabase.auth.exchangeCodeForSession(code);
+  if (!code) {
+    return NextResponse.redirect(new URL('/', url.origin))
   }
 
-  return NextResponse.redirect(`${url.origin}${next}`);
+  const cookieStore = cookies()
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (name: string) => cookieStore.get(name)?.value,
+        set: (name: string, value: string, options: any) => {
+          cookieStore.set(name, value, options)
+        },
+        remove: (name: string, options: any) => {
+          cookieStore.set(name, '', { ...(options as any), maxAge: 0 })
+        },
+      },
+    }
+  )
+
+  // Exchange the code for a session; sets sb-* cookies
+  await supabase.auth.exchangeCodeForSession(code)
+
+  // Send them to the dashboard (or whatever 'next' was)
+  return NextResponse.redirect(new URL(next, url.origin))
 }
